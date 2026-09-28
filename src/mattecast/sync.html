@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>mattecast sync test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #e6e8ee; font: 16px/1.45 system-ui, -apple-system, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; text-align: center; }
+  .box { max-width: 460px; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  p, li { color: #aab1c0; font-size: 15px; }
+  ol { text-align: left; padding-left: 20px; }
+  button { font: inherit; font-size: 18px; padding: 14px 26px; border-radius: 12px; border: 0; background: #5b8cff; color: #fff; margin: 8px 4px; }
+  button.secondary { background: #262a33; color: #e6e8ee; }
+  #status { font-variant-numeric: tabular-nums; font-size: 17px; color: #e6e8ee; min-height: 1.5em; }
+  body.running .box { opacity: .55; }
+  body.flash, body.flash .box { background: #fff; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>A/V sync test</h1>
+  <div id="intro">
+    <ol>
+      <li>Volume up, silent mode off, brightness up. Disconnect Bluetooth headphones so the beep comes out of the phone.</li>
+      <li>On the computer, look at the control panel preview. It switches to <b>Camera</b> (the plain webcam picture without the cut-out) when you press Start. If it still shows your background, click <b>Camera</b> there.</li>
+      <li>Press Start, then turn this phone around: <b>screen facing the webcam lens</b>, 20 to 40 cm away, speaker toward the webcam.</li>
+      <li>In the Camera preview, check that the whole phone screen is in the picture and flashing. Hold still and keep quiet for about 15 seconds.</li>
+    </ol>
+    <p>The screen flashes white and beeps at the same moment once a second. mattecast measures how much later the camera sees the flash than the microphone hears the beep.</p>
+  </div>
+  <p id="status"></p>
+  <div id="buttons">
+    <button id="start">Start</button>
+  </div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+let ctx = null, running = false, next = 0, pending = [], wake = null;
+
+async function post(path) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function perfTimeOf(t) {
+  // Map an AudioContext time to performance.now(), including output latency.
+  const ts = ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : null;
+  if (ts && ts.performanceTime) return ts.performanceTime + (t - ts.contextTime) * 1000;
+  const lat = ctx.outputLatency || ctx.baseLatency || 0;
+  return performance.now() + (t - ctx.currentTime + lat) * 1000;
+}
+function beep(t) {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.frequency.value = 1000;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.9, t + 0.002);
+  g.gain.setValueAtTime(0.9, t + 0.06);
+  g.gain.linearRampToValueAtTime(0, t + 0.066);
+  o.connect(g).connect(ctx.destination);
+  o.start(t); o.stop(t + 0.1);
+}
+function schedule() {
+  while (next < ctx.currentTime + 1.2) {
+    beep(next);
+    pending.push(perfTimeOf(next));
+    next += 1.0;
+  }
+}
+function frame(now) {
+  if (!running) { document.body.classList.remove("flash"); return; }
+  schedule();
+  // rAF runs at the start of a frame that reaches the glass about one refresh later.
+  const ahead = now + 16.7;
+  const flashing = pending.some((w) => ahead >= w && ahead < w + 100);
+  pending = pending.filter((w) => now < w + 250);
+  document.body.classList.toggle("flash", flashing);
+  requestAnimationFrame(frame);
+}
+async function start() {
+  try {
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    await ctx.resume();
+    await post("/api/sync/start");
+  } catch (e) { $("status").textContent = "Could not start: " + e.message; return; }
+  try { wake = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null; } catch (_) { wake = null; }
+  $("intro").style.display = "none";
+  $("buttons").innerHTML = "";
+  document.body.classList.add("running");
+  // Leave a moment to turn the screen toward the webcam before the first flash.
+  running = true; next = ctx.currentTime + 1.5; pending = [];
+  requestAnimationFrame(frame);
+  poll();
+}
+function stop() {
+  running = false; document.body.classList.remove("running", "flash");
+  if (wake) { wake.release().catch(() => {}); wake = null; }
+}
+async function poll() {
+  let s;
+  try { s = await (await fetch("/api/state")).json(); } catch (_) { setTimeout(poll, 800); return; }
+  const r = s.sync_test || {};
+  if (r.pairs) $("status").textContent = `${r.pairs} / ${r.target} measured: camera is ${r.offset_ms} ms behind the mic (spread ${r.spread_ms} ms)`;
+  else $("status").textContent = "Listening and watching... Point this screen at the webcam.";
+  if (running && !r.active) {
+    stop();
+    if (r.pairs) {
+      $("status").textContent = `Camera is ${r.offset_ms} ms behind the mic (spread ${r.spread_ms} ms over ${r.pairs} flashes).` +
+        (r.spread_ms > 25 ? " The spread is large; hold the phone steadier, keep the room quiet, and run it again." : "");
+      $("buttons").innerHTML = "";
+      const apply = document.createElement("button"); apply.textContent = "Apply";
+      apply.onclick = async () => { await post("/api/sync/apply"); $("status").textContent = "Applied. Audio delay now follows the video with this offset."; apply.remove(); };
+      const again = document.createElement("button"); again.textContent = "Run again"; again.className = "secondary"; again.onclick = start;
+      $("buttons").append(apply, again);
+    } else {
+      $("status").textContent = "No flash/beep pairs detected. In the control panel, switch the preview to Camera and check that this screen faces the webcam and is fully in the picture. Also check the volume and silent mode, then try again.";
+      $("buttons").innerHTML = ""; const again = document.createElement("button"); again.textContent = "Try again"; again.onclick = start; $("buttons").append(again);
+    }
+    return;
+  }
+  if (running) setTimeout(poll, 500);
+}
+$("start").onclick = start;
+</script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mattecast</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --line: #262a33; --text: #e6e8ee; --muted: #8b93a3;
+    --accent: #5b8cff; --good: #3ecf8e; --warn: #f5a524; --bad: #f25f5c; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; letter-spacing: .2px; }
+  .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pill b { color: var(--text); font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--muted); vertical-align: 1px; }
+  main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 16px; padding: 16px 20px 24px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+  section + section { margin-top: 16px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .preview { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16 / 9; }
+  .preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  button { background: #222733; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  button:hover { border-color: #3a4150; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .tile { position: relative; aspect-ratio: 16 / 10; border-radius: 8px; border: 2px solid transparent; background: #1f232c center / cover no-repeat; cursor: pointer; overflow: hidden; display: flex; align-items: flex-end; }
+  .tile.on { border-color: var(--accent); }
+  .tile .label { width: 100%; padding: 3px 6px; font-size: 11px; background: linear-gradient(transparent, rgba(0,0,0,.75)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .kind { position: absolute; top: 4px; left: 4px; font-size: 10px; background: rgba(0,0,0,.6); padding: 1px 5px; border-radius: 4px; color: #cfd5e2; }
+  .tile .del { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; padding: 0; line-height: 18px; font-size: 13px; border-radius: 50%; background: rgba(0,0,0,.65); display: none; }
+  .tile:hover .del { display: block; }
+  .tile.special { align-items: center; justify-content: center; font-weight: 600; color: #cfd5e2; }
+  .tile.upload { border: 2px dashed #3a4150; color: var(--muted); align-items: center; justify-content: center; text-align: center; font-size: 12px; padding: 6px; }
+  .tile.upload.drag { border-color: var(--accent); color: var(--text); }
+  .opts { display: flex; gap: 12px; align-items: center; margin-top: 10px; flex-wrap: wrap; color: var(--muted); }
+  input[type=range] { width: 140px; }
+  input[type=color] { width: 40px; height: 26px; border: 0; background: none; padding: 0; }
+  label.field { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
+  label.field:first-of-type { border-top: 0; }
+  select { background: #222733; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font: inherit; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .log { font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); max-height: 140px; overflow: auto; }
+  .meter { flex: 1; height: 10px; background: #222733; border-radius: 5px; overflow: hidden; min-width: 120px; }
+  .meter div { height: 100%; width: 0; background: var(--good); transition: width .12s linear; }
+  .meter.muted div { background: var(--muted); }
+  button.danger { background: #3a2226; border-color: #5a2b30; }
+  input[type=number] { width: 80px; background: #222733; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; }
+  .mono { font-variant-numeric: tabular-nums; }
+  .callout { background: #1d2230; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .callout ol.steps { margin: 8px 0 0; padding-left: 20px; }
+  .callout ol.steps li { margin: 3px 0; }
+  .callout code { background: #262a33; padding: 0 4px; border-radius: 4px; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #222733; border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>mattecast</h1>
+  <span class="pill"><span class="dot" id="dot"></span><b id="fps">-</b> fps</span>
+  <span class="pill">proc <b id="proc">-</b> ms</span>
+  <span class="pill">latency <b id="lat">-</b> ms</span>
+  <span class="pill">model <b id="res">-</b></span>
+  <span class="pill">tracking <b id="trk">-</b></span>
+</header>
+<main>
+  <div>
+    <section>
+      <div class="preview"><img id="preview" src="/preview.mjpg" alt="preview"></div>
+      <div class="row">
+        <div class="seg" id="views">
+          <button data-v="composite">Output</button><button data-v="alpha">Matte</button><button data-v="camera">Camera</button>
+        </div>
+        <button id="reseed" title="Forget the current subject and detect the person again">Re-detect person</button>
+        <span class="hint">Preview only; Zoom always gets the output.</span>
+      </div>
+    </section>
+    <section>
+      <h2>Events</h2>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+  <div>
+    <section>
+      <h2>Background</h2>
+      <div class="grid" id="bgs"></div>
+      <div class="opts" id="blurOpts">Blur <input type="range" id="blur" min="2" max="30" step="1" value="12"></div>
+      <div class="opts" id="colorOpts">Color <input type="color" id="color" value="#00b140"></div>
+      <input type="file" id="file" accept="image/*,video/*,.gif,.webp,.apng" hidden multiple>
+      <p class="hint">Upload a still image, a GIF, or a short video (mp4, mov, webm). Animations and videos loop. You can also drop files anywhere on this page.</p>
+    </section>
+    <section id="audioSec">
+      <h2>Microphone</h2>
+      <p class="hint" id="audioOff">Audio forwarding is off. It turns on by itself when the camera has a microphone and the capture card's HDMI audio port is found; otherwise pass <code>--audio-in</code> and <code>--audio-out</code>.</p>
+      <div id="audioOn" style="display:none">
+        <div class="row" style="margin-top:0"><div class="meter" id="meter"><div id="meterBar"></div></div><button id="mute">Mute</button></div>
+        <p class="hint mono" id="audioRoute"></p>
+        <label class="field">Delay
+          <span class="seg" id="delayMode"><button data-m="auto">Auto</button><button data-m="manual">Manual</button></span></label>
+        <p class="hint mono" id="autoLine"></p>
+        <label class="field" id="manualRow">Fixed delay <span><input type="range" id="manual" min="0" max="500" step="5"> <b class="mono" id="manualVal"></b></span></label>
+        <label class="field">Camera behind mic (ms) <input type="number" id="camOffset" step="1"></label>
+        <label class="field">Capture card video lag (ms) <input type="number" id="outSkew" step="1"></label>
+        <div class="row"><button id="syncBtn">Measure with your phone</button></div>
+        <div class="callout" id="syncBox" style="display:none">
+          <div id="syncWarn" style="display:none; margin-bottom:8px; color:var(--warn)"><b>Your phone cannot reach mattecast yet:</b> it only listens on this computer.
+            Stop it (Ctrl+C) and start it again with <code>--control-host 0.0.0.0</code> (phone on the same Wi-Fi)
+            or <code>--control-host $(tailscale ip -4)</code> (Tailscale), then open this panel again.</div>
+          <div id="syncHow">
+            <div><b>The preview now shows Camera</b>, the plain webcam picture without the cut-out, so you can see the phone. Keep it on Camera during the test.</div>
+            <ol class="steps">
+              <li>On your phone: volume up, silent mode off, brightness up, Bluetooth headphones off.</li>
+              <li>Open <span id="syncUrl">the <code>/sync</code> page</span> on the phone and press <b>Start</b>.</li>
+              <li>Turn the phone around: <b>its screen faces the webcam lens</b>, 20 to 40 cm away, speaker toward the webcam.</li>
+              <li>Check in the preview that the whole phone screen is in the picture and flashing. Hold still and stay quiet for about 15 seconds.</li>
+            </ol>
+          </div>
+          <div class="mono" id="syncStatus" style="margin-top:6px"></div>
+          <div class="row"><button id="syncApply" style="display:none">Apply</button><button id="syncStop">Close</button></div>
+        </div>
+      </div>
+    </section>
+    <section>
+      <h2>Quality</h2>
+      <label class="field">Model resolution (short side)
+        <select id="internal_size"></select></label>
+      <label class="field">Edge upsampling
+        <select id="refine"><option value="guided">Guided filter</option><option value="bilinear">Bilinear</option></select></label>
+      <label class="field">Remove color fringe on hair edges <input type="checkbox" id="defringe"></label>
+      <label class="field">Mirror output <input type="checkbox" id="mirror"></label>
+      <p class="hint">Changing the model resolution re-detects the person. At 30 fps keep processing time under 33 ms.</p>
+    </section>
+  </div>
+</main>
+<div id="toast"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+let state = null, libKey = "", specKey = "";
+
+function toast(msg, ms = 2500) {
+  const t = $("toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast._h); toast._h = setTimeout(() => t.style.display = "none", ms);
+}
+async function api(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { toast(j.error || r.statusText); throw new Error(j.error); }
+  return j;
+}
+function tile({ label, kind, thumb, on, special, onclick, ondel, bgcolor }) {
+  const d = document.createElement("div");
+  d.className = "tile" + (on ? " on" : "") + (special ? " special" : "");
+  if (thumb) d.style.backgroundImage = `url("${thumb}")`;
+  if (bgcolor) d.style.background = bgcolor;
+  if (special) d.textContent = label;
+  else { const l = document.createElement("div"); l.className = "label"; l.textContent = label; d.appendChild(l); }
+  if (kind) { const k = document.createElement("span"); k.className = "kind"; k.textContent = kind; d.appendChild(k); }
+  if (ondel) {
+    const x = document.createElement("button"); x.className = "del"; x.textContent = "×"; x.title = "Delete";
+    x.onclick = (e) => { e.stopPropagation(); ondel(); }; d.appendChild(x);
+  }
+  d.onclick = onclick;
+  return d;
+}
+function renderBackgrounds() {
+  const spec = state.background, grid = $("bgs");
+  grid.innerHTML = "";
+  const is = (t, n) => spec.type === t && (n === undefined || spec.name === n);
+  grid.appendChild(tile({ label: "Original", special: true, on: is("none"), onclick: () => api("/api/background", { type: "none" }).then(poll) }));
+  grid.appendChild(tile({ label: "Blur", special: true, on: is("blur"), bgcolor: "linear-gradient(135deg,#39414f,#1d2129)",
+    onclick: () => api("/api/background", { type: "blur", strength: +$("blur").value }).then(poll) }));
+  grid.appendChild(tile({ label: "Color", special: true, on: is("color"), bgcolor: $("color").value,
+    onclick: () => api("/api/background", { type: "color", color: $("color").value }).then(poll) }));
+  for (const item of state.library) {
+    grid.appendChild(tile({
+      label: item.name, kind: item.kind === "image" ? "" : item.kind,
+      thumb: "/api/thumb/" + encodeURIComponent(item.name), on: is("library", item.name),
+      onclick: () => { toast("Loading " + item.name + "..."); api("/api/background", { type: "library", name: item.name }).then(() => { toast("Background: " + item.name); poll(); }); },
+      ondel: () => { if (confirm("Delete " + item.name + "?")) api("/api/delete", { name: item.name }).then(poll); },
+    }));
+  }
+  const up = tile({ label: "", onclick: () => $("file").click() });
+  up.className = "tile upload"; up.textContent = "+ Upload"; up.id = "uploadTile";
+  grid.appendChild(up);
+  $("blurOpts").style.display = spec.type === "blur" ? "flex" : "none";
+  $("colorOpts").style.display = spec.type === "color" ? "flex" : "none";
+}
+function upload(file) {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload?select=1&name=" + encodeURIComponent(file.name));
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) toast(`Uploading ${file.name}: ${Math.round(100 * e.loaded / e.total)}%`, 60000); };
+    xhr.onload = () => {
+      let j = {}; try { j = JSON.parse(xhr.responseText); } catch (_) {}
+      toast(xhr.status === 200 ? "Background: " + j.name : "Upload failed: " + (j.error || xhr.statusText));
+      resolve(); poll();
+    };
+    xhr.onerror = () => { toast("Upload failed"); resolve(); };
+    xhr.send(file);
+  });
+}
+async function uploadAll(files) { for (const f of files) await upload(f); }
+
+function render() {
+  const s = state.stats;
+  $("fps").textContent = s.fps.toFixed(1);
+  $("proc").textContent = s.proc_ms_p50 == null ? "-" : `${s.proc_ms_p50} / p95 ${s.proc_ms_p95}`;
+  $("lat").textContent = s.latency_ms_p50 == null ? "-" : s.latency_ms_p50;
+  $("res").textContent = s.internal;
+  $("trk").textContent = s.seeded ? (s.iou == null ? "on" : `on, IoU ${s.iou}`) : "searching";
+  $("dot").style.background = s.fps > 20 ? "var(--good)" : s.fps > 0 ? "var(--warn)" : "var(--bad)";
+  for (const b of document.querySelectorAll("#views button")) b.classList.toggle("on", b.dataset.v === state.preview_view);
+  const set = s.settings;
+  const sel = $("internal_size");
+  if (!sel.options.length) for (const v of state.internal_sizes) sel.add(new Option(v + "p", v));
+  if (![...sel.options].some(o => +o.value === set.internal_size)) sel.add(new Option(set.internal_size + "p", set.internal_size));
+  if (document.activeElement !== sel) sel.value = set.internal_size;
+  if (document.activeElement !== $("refine")) $("refine").value = set.refine;
+  $("defringe").checked = set.defringe; $("mirror").checked = set.mirror;
+  if (state.background.type === "blur" && document.activeElement !== $("blur")) $("blur").value = state.background.strength;
+  if (state.background.type === "color" && document.activeElement !== $("color")) $("color").value = state.background.color;
+  const lk = JSON.stringify(state.library), sk = JSON.stringify(state.background);
+  if (lk !== libKey || sk !== specKey) { libKey = lk; specKey = sk; renderBackgrounds(); }
+  renderAudio();
+  $("log").innerHTML = state.events.slice().reverse()
+    .map(e => `<div>${new Date(e.t * 1000).toLocaleTimeString()}  ${e.msg.replace(/</g, "&lt;")}</div>`).join("");
+}
+function renderAudio() {
+  const a = state.audio;
+  $("audioOff").style.display = a ? "none" : "block";
+  $("audioOn").style.display = a ? "block" : "none";
+  if (!a) return;
+  const sy = a.sync;
+  $("mute").textContent = a.muted ? "Unmute" : "Mute";
+  $("mute").classList.toggle("danger", a.muted);
+  $("meter").classList.toggle("muted", a.muted);
+  $("audioRoute").textContent = `${a.input}  ->  ${a.output}`;
+  for (const b of document.querySelectorAll("#delayMode button")) b.classList.toggle("on", b.dataset.m === sy.mode);
+  $("manualRow").style.display = sy.mode === "manual" ? "flex" : "none";
+  $("autoLine").textContent = sy.mode === "auto"
+    ? (sy.video_ms == null ? `waiting for video... holding ${sy.target_ms} ms`
+      : `video ${sy.video_ms} + camera ${sy.cam_offset_ms} + card ${sy.out_skew_ms} - output buffer ${sy.sink_ms} = ${sy.target_ms} ms`)
+    : `holding ${sy.target_ms} ms (output buffer adds ${sy.sink_ms} ms)`;
+  if (document.activeElement !== $("manual")) { $("manual").value = sy.manual_ms; $("manualVal").textContent = sy.manual_ms + " ms"; }
+  if (document.activeElement !== $("camOffset")) $("camOffset").value = sy.cam_offset_ms;
+  if (document.activeElement !== $("outSkew")) $("outSkew").value = sy.out_skew_ms;
+  const r = state.sync_test;
+  if (r && (r.active || r.pairs)) {
+    $("syncBox").style.display = "block";
+    $("syncStatus").textContent = r.pairs
+      ? `${r.pairs}/${r.target} flashes: camera ${r.offset_ms} ms behind mic (spread ${r.spread_ms} ms)${r.active ? "" : "  done"}`
+      : (r.active ? "waiting for the first flash and beep... (is the phone screen visible in the Camera preview?)"
+                  : "nothing detected: check that the phone screen faces the webcam in the Camera preview, the volume is up and silent mode is off");
+    $("syncApply").style.display = !r.active && r.pairs ? "inline-block" : "none";
+  }
+}
+async function pollLevel() {
+  if (state && state.audio) {
+    try {
+      const a = await (await fetch("/api/level")).json();
+      const pct = Math.max(0, Math.min(100, (a.level_db + 60) / 60 * 100));
+      $("meterBar").style.width = (a.muted ? 0 : pct) + "%";
+    } catch (_) {}
+  }
+  setTimeout(pollLevel, 150);
+}
+async function poll() {
+  try { state = await (await fetch("/api/state")).json(); render(); $("dot").title = ""; }
+  catch (e) { $("dot").style.background = "var(--bad)"; $("dot").title = "disconnected"; }
+}
+
+for (const b of document.querySelectorAll("#views button")) b.onclick = () => api("/api/settings", { preview_view: b.dataset.v }).then(poll);
+$("reseed").onclick = () => api("/api/reseed").then(() => toast("Re-detecting person"));
+$("internal_size").onchange = (e) => api("/api/settings", { internal_size: +e.target.value }).then(poll);
+$("refine").onchange = (e) => api("/api/settings", { refine: e.target.value }).then(poll);
+$("defringe").onchange = (e) => api("/api/settings", { defringe: e.target.checked }).then(poll);
+$("mirror").onchange = (e) => api("/api/settings", { mirror: e.target.checked }).then(poll);
+$("blur").onchange = (e) => api("/api/background", { type: "blur", strength: +e.target.value }).then(poll);
+$("color").onchange = (e) => api("/api/background", { type: "color", color: e.target.value }).then(poll);
+$("file").onchange = (e) => { uploadAll([...e.target.files]); e.target.value = ""; };
+document.addEventListener("dragover", (e) => { e.preventDefault(); $("uploadTile")?.classList.add("drag"); });
+document.addEventListener("dragleave", () => $("uploadTile")?.classList.remove("drag"));
+document.addEventListener("drop", (e) => { e.preventDefault(); $("uploadTile")?.classList.remove("drag"); uploadAll([...e.dataTransfer.files]); });
+// Reconnect the MJPEG stream if the engine restarts or the network blips.
+$("preview").onerror = () => setTimeout(() => { $("preview").src = "/preview.mjpg?" + Date.now(); }, 1000);
+$("mute").onclick = () => api("/api/audio", { muted: !state.audio.muted }).then(poll);
+for (const b of document.querySelectorAll("#delayMode button")) b.onclick = () => api("/api/audio", { mode: b.dataset.m }).then(poll);
+$("manual").oninput = (e) => { $("manualVal").textContent = e.target.value + " ms"; };
+$("manual").onchange = (e) => api("/api/audio", { manual_ms: +e.target.value }).then(poll);
+$("camOffset").onchange = (e) => api("/api/audio", { cam_offset_ms: +e.target.value }).then(poll);
+$("outSkew").onchange = (e) => api("/api/audio", { out_skew_ms: +e.target.value }).then(poll);
+$("syncBtn").onclick = async () => {
+  const j = await api("/api/sync/prepare");
+  const h = location.hostname;
+  const openedLocally = h === "localhost" || h.startsWith("127.") || h === "[::1]";
+  const urls = openedLocally ? j.urls : [location.origin + "/sync"];
+  const box = $("syncUrl");
+  box.textContent = "";
+  if (urls.length) {
+    urls.forEach((u, i) => {
+      if (i) box.append(i === urls.length - 1 ? " or " : ", ");
+      const b = document.createElement("b"); b.className = "mono"; b.textContent = u; box.append(b);
+    });
+  } else {
+    box.innerHTML = "the <code>/sync</code> page";
+  }
+  $("syncWarn").style.display = urls.length ? "none" : "block";
+  $("syncBox").style.display = "block";
+  $("syncStatus").textContent = "The test starts when you press Start on the phone.";
+  $("syncApply").style.display = "none";
+  poll();
+};
+$("syncApply").onclick = () => api("/api/sync/apply").then((j) => { toast(`Camera offset set to ${j.cam_offset_ms} ms`); $("syncBox").style.display = "none"; poll(); });
+$("syncStop").onclick = () => api("/api/sync/stop").then(() => { $("syncBox").style.display = "none"; poll(); });
+poll(); setInterval(poll, 1000); pollLevel();
+</script>
+</body>
+</html>
